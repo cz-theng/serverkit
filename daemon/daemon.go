@@ -38,7 +38,6 @@ func Boot(lockFilePath,pidFilePath string){
 
 	if pid >0 {
 		// parent just exit
-		fmt.Printf("Parent with pid %d\n",pid)
 		os.Exit(0)
 	}
 
@@ -98,9 +97,9 @@ func Boot(lockFilePath,pidFilePath string){
 	syscall.Umask(0x0000)
 
 	// close 
-//	syscall.Close(syscall.Stdin)
-//	syscall.Close(syscall.Stdout)
-//	syscall.Close(syscall.Stderr)
+	syscall.Close(syscall.Stdin)
+	syscall.Close(syscall.Stdout)
+	syscall.Close(syscall.Stderr)
 
 
 	// redict
@@ -109,8 +108,8 @@ func Boot(lockFilePath,pidFilePath string){
 		panic(err)
 	}
 	syscall.Dup2(fd,syscall.Stdin)
-//	syscall.Dup2(fd,syscall.Stdout)
-//	syscall.Dup2(fd,syscall.Stderr)
+	syscall.Dup2(fd,syscall.Stdout)
+	syscall.Dup2(fd,syscall.Stderr)
 
 
 	// signal

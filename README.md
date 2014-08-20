@@ -1,4 +1,1 @@
-golangutils
-===========
-
 Utilities for golang

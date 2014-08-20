@@ -57,7 +57,10 @@ func init(){
 }
 
 func Init() error {
-	_logger = NewLogger("./","log","Log4Golang",DEBUG)
+	_logger,err := NewLogger("./","log","Log4Golang",DEBUG)
+	if err != nil {
+		return err
+	}
 	_logger.SetCallDepth(3)
 	return nil
 }
@@ -74,13 +77,13 @@ func GetLogger(logName string) *Logger{
 	return logger
 }
 
-func NewLogger(path,baseName,logName string,level Level)( *Logger){
+func NewLogger(path,baseName,logName string,level Level)( *Logger,error){
 	var err error
 	logger := &Logger{path:path,baseName:baseName,logName:logName,level:level}
 
 	err = os.MkdirAll(path,os.ModePerm)
 	if err != nil {
-		panic(err)
+		return nil,err
 	}
 
 	path = strings.TrimSuffix(path,"/")
@@ -88,17 +91,17 @@ func NewLogger(path,baseName,logName string,level Level)( *Logger){
 
 	logger.logFd, err= os.OpenFile(path+"/"+baseName+".log",flag,0666)
 	if err != nil {
-		panic(err)
+		return nil,err
 	}
 
 	logger.errFd, err= os.OpenFile(path+"/"+baseName+".err",flag,0666)
 	if err != nil {
-		panic(err)
+		return nil,err
 	}
 
 	logger.trcFd, err= os.OpenFile(path+"/"+baseName+".trace",flag,0666)
 	if err != nil {
-		panic(err)
+		return nil,err
 	}
 
 	logger.debugSwitch   = true
@@ -106,7 +109,7 @@ func NewLogger(path,baseName,logName string,level Level)( *Logger){
 	logger.callDepth     = 2
 
 	_loggers[logName] = logger
-	return logger
+	return logger,nil
 }
 
 func (l *Logger) SetCallDepth(d int){
