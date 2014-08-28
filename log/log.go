@@ -106,7 +106,7 @@ func NewLogger(path,baseName,logName string,level Level)( *Logger,error){
 
 	logger.debugSwitch   = true
 	logger.debugOutputer = STD
-	logger.callDepth     = 2
+	logger.callDepth     = 3
 
 	_loggers[logName] = logger
 	return logger,nil
