@@ -142,27 +142,7 @@ func (l *Logger) getTime() string {
 	return string(buf[:])
 }
 
-/*
-func (l *Logger) updateFD()(err error) {
-	var filePath string
-	l.mtx.Lock()
-	defer l.mtx.Unlock()
-
-	if l.errSize >l.fileSize {
-		l.errFd.Sync()
-		l.errFd.Close()
-		filePath = filepath.Join( l.logPath, "/", l.fileName+ ".error")
-		l.errFd,err = openLogFile(filePath)
-		if err != nil {
-			return 
-		}
-	}
-	err = nil
-	return 
-}
-*/
-
-func (l *Logger) Output(level Level, prefix string,format string,v... interface{}) (err error) {
+func (l *Logger) output(level Level, prefix string,format string,v... interface{}) (err error) {
 	var levelStr string 
 	if level == LDEBUG {
 		levelStr = "[DEBUG]"
@@ -228,7 +208,7 @@ func (l *Logger) Debug(format string,v... interface{}) error {
 		return nil
 	}
 
-	err := l.Output(LDEBUG, "["+l.getTime()+"]["+l.getFileLine()+"]", format, v...)
+	err := l.output(LDEBUG, "["+l.getTime()+"]["+l.getFileLine()+"]", format, v...)
 	return err
 }
 
@@ -237,7 +217,7 @@ func (l *Logger) Info(format string,v...interface{}) error{
 		return nil
 	}
 
-	err := l.Output(LINFO,"["+l.getTime()+"]["+l.getFileLine()+"]", format, v...)
+	err := l.output(LINFO,"["+l.getTime()+"]["+l.getFileLine()+"]", format, v...)
 	return err
 }
 
@@ -245,7 +225,7 @@ func (l *Logger) Warning(format string,v...interface{}) error{
 	if l.level > LWARNING {
 		return nil
 	}
-	err := l.Output(LWARNING,"["+l.getTime()+"]["+l.getFileLine()+"]", format, v...)
+	err := l.output(LWARNING,"["+l.getTime()+"]["+l.getFileLine()+"]", format, v...)
 	return err
 }
 
@@ -253,7 +233,7 @@ func (l *Logger) Error(format string,v...interface{}) error{
 	if l.level > LERROR {
 		return nil
 	}
-	err := l.Output(LERROR,"["+l.getTime()+"]["+l.getFileLine()+"]", format, v...)
+	err := l.output(LERROR,"["+l.getTime()+"]["+l.getFileLine()+"]", format, v...)
 	return err
 }
 
@@ -262,7 +242,7 @@ func (l *Logger) Fatal(format string,v... interface{}) error{
 		return nil
 	}
 	
-	err := l.Output(LFATAL,"["+l.getTime()+"]["+l.getFileLine()+"]", format, v...)
+	err := l.output(LFATAL,"["+l.getTime()+"]["+l.getFileLine()+"]", format, v...)
 	return err
 }
 
