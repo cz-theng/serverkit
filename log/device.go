@@ -59,6 +59,9 @@ func (fd *FileDevice) SetFileName(fileName string) {
 
 
 func (fd *FileDevice) Write(buf []byte) (n int, err error) {
+	fd.mtx.Lock()
+	defer fd.mtx.Unlock()
+
 	bufLen := uint64(len(buf))
 	if bufLen+fd.logLen <= fd.fileSize {
 		n,err = fd.fp.Write(buf)

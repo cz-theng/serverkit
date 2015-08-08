@@ -21,3 +21,4 @@ fmt : $(SRC_FILES)
 clean:
 	go clean
 	-rm -rf $(TARGET)
+	-rm -rf test

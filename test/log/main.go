@@ -19,13 +19,13 @@ func main() {
 
 	//log to file
 	// log.New(logPath, logName string)
-	logger, err:= log.NewFileLogger("./test/log", "test")
+	logger, err:= log.NewFileLogger("./test", "test")
 	if err != nil {
 		println("New file logger error")
 		fmt.Println(err)
 		return 
 	}
-	logger.SetMaxFileSize(300) // 4M default 500M
+	logger.SetMaxFileSize(300) // 300Byte
 	logger.SetLevel(log.LDEBUG)
 
 
