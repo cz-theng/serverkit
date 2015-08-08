@@ -8,10 +8,8 @@ package log
 
 import (
 	"sync"
-	"io"
 	"fmt"
-	"os"
-	"strings"
+	"path/filepath"
 	"errors"
 	"runtime"
 	"time"
@@ -41,16 +39,15 @@ const (
 var EOutput error = errors.New("Output is invalied!")
 
 type Logger struct {
-	mtx        sync.Mutex
-	logFd      io.Writer
-	errFd      io.Writer
 	level      Level
-	buf        []byte
-	logPath    string
-	fileName   string
+	logDevice  *FileDevice
+	errDevice  *FileDevice
+	conDevice  *ConsoleDevice
 	outputer   Outputer
+
+	mtx        sync.Mutex
+	buf        []byte
 	callDepth  int
-	fileSize   int64
 }
 
 var _logger *Logger
@@ -64,28 +61,24 @@ func init(){
 	_logger.SetCallDepth(3)
 }
 
-func NewConsoleLogger() (*Logger,error) {
-	logger := &Logger{level:LDEBUG,outputer:OUT_STD}
-	return logger,nil
+func NewConsoleLogger() (*Logger, error) {
+	var err error
+	logger := &Logger{level:LDEBUG, outputer:OUT_STD, callDepth:3}
+	logger.conDevice,err = NewConsoleDevice()
+	return logger,err
 }
 
-func NewFileLogger(logPath,fileName string)( *Logger,error){
+func NewFileLogger(logPath, fileName string)( *Logger,error){
 	var err error
-	logger := &Logger{logPath:logPath, fileName:fileName, level:LDEBUG, outputer:OUT_FILE, callDepth:2}
-	err = os.MkdirAll(logger.logPath,os.ModePerm)
+	logger := &Logger{level:LDEBUG, outputer:OUT_FILE, callDepth:2}
+	logFileName := filepath.Join(logPath, fileName+".log")
+	logger.logDevice, err = NewFileDevice(logFileName)
 	if err != nil {
-		return nil,err
+		return nil, err
 	}
 
-	logger.logPath = strings.TrimSuffix(logger.logPath,"/")
-	flag := os.O_WRONLY|os.O_APPEND|os.O_CREATE
-
-	logger.logFd, err= os.OpenFile(logger.logPath+"/"+logger.fileName+".log",flag,0666)
-	if err != nil {
-		return nil,err
-	}
-
-	logger.errFd, err= os.OpenFile(logger.logPath+"/"+logger.fileName+".error",flag,0666)
+	errFileName := filepath.Join(logPath, fileName+".error")
+	logger.errDevice, err = NewFileDevice(errFileName)
 	if err != nil {
 		return nil,err
 	}
@@ -129,7 +122,7 @@ func itoa(i int, wid int) string {
 	return string(b[bp:])
 }
 
-func (l *Logger) getTime() string{
+func (l *Logger) getTime() string {
 	// Time is yyyy-mm-dd hh:mm:ss.microsec
 	var buf  []byte
 	t := time.Now()
@@ -149,20 +142,27 @@ func (l *Logger) getTime() string{
 	return string(buf[:])
 }
 
-func (l *Logger) Output(level Level, prefix string,format string,v... interface{}) (err error) {
-	var fd io.Writer
-	if l.outputer == OUT_STD {
-		fd  = os.Stdin
-	} else if l.outputer == OUT_FILE {
-		if level <= LWARNING {
-			fd = l.logFd
-		} else {
-			fd = l.errFd
-		}
-	} else {
-		return EOutput 
-	}
+/*
+func (l *Logger) updateFD()(err error) {
+	var filePath string
+	l.mtx.Lock()
+	defer l.mtx.Unlock()
 
+	if l.errSize >l.fileSize {
+		l.errFd.Sync()
+		l.errFd.Close()
+		filePath = filepath.Join( l.logPath, "/", l.fileName+ ".error")
+		l.errFd,err = openLogFile(filePath)
+		if err != nil {
+			return 
+		}
+	}
+	err = nil
+	return 
+}
+*/
+
+func (l *Logger) Output(level Level, prefix string,format string,v... interface{}) (err error) {
 	var levelStr string 
 	if level == LDEBUG {
 		levelStr = "[DEBUG]"
@@ -173,7 +173,7 @@ func (l *Logger) Output(level Level, prefix string,format string,v... interface{
 	} else if level == LERROR {
 		levelStr = "[ERROR]"
 	} else if level == LFATAL {
-		levelStr = "FATAL"
+		levelStr = "[FATAL]"
 	} else {
 		levelStr = "[UNKNOWN LEVEL]"
 	}
@@ -197,20 +197,29 @@ func (l *Logger) Output(level Level, prefix string,format string,v... interface{
 	if len(msg)>0 && msg[len(msg)-1]!= '\n'{
 		l.buf = append(l.buf,'\n')
 	}
-	_,err = fd.Write(l.buf)
+
+	if l.outputer == OUT_STD {
+		_,err = l.conDevice.Write(l.buf)
+	} else if l.outputer == OUT_FILE {
+		if level <= LWARNING {
+			_,err = l.logDevice.Write(l.buf)
+		} else {
+			_,err = l.errDevice.Write(l.buf)
+		} 
+	} else {
+		err = EOutput
+	}
 	return 
 }
 
-
-
-func (l *Logger) SetMaxFileSize(fileSize int64) {
-	l.fileSize = fileSize
+func (l *Logger) SetMaxFileSize(fileSize uint64) {
+	l.logDevice.SetFileSize(fileSize)
+	l.errDevice.SetFileSize(fileSize)
 }
 
 func (l *Logger) SetLevel (level Level) {
 	l.level = level
 }
-
 
 /** Nothing to change */
 
@@ -256,8 +265,6 @@ func (l *Logger) Fatal(format string,v... interface{}) error{
 	err := l.Output(LFATAL,"["+l.getTime()+"]["+l.getFileLine()+"]", format, v...)
 	return err
 }
-
-
 
 func DEBUG(format string,v... interface{}) error{
 	return _logger.Debug(format,v...)

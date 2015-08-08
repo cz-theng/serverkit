@@ -25,7 +25,7 @@ func main() {
 		fmt.Println(err)
 		return 
 	}
-	logger.SetMaxFileSize(4*1024) // 4M default 500M
+	logger.SetMaxFileSize(300) // 4M default 500M
 	logger.SetLevel(log.LDEBUG)
 
 
