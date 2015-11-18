@@ -32,10 +32,9 @@ func (ctx *Context) fatherDo(procName string) (err error) {
 	}
 	syscall.Write(lockFd, []byte(procName))
 	err = syscall.Flock(lockFd, syscall.LOCK_EX|syscall.LOCK_NB)
-	//syscall.Close(lockFd)
 	if err != nil {
 		fmt.Println("The Process is already runing ")
-		return
+		os.Exit(-1)
 	}
 
 	stdin, err := os.Open(os.DevNull)
