@@ -5,9 +5,10 @@
 package daemon
 
 import (
+	"errors"
 	"fmt"
 	"os"
-	"runtime"
+	"path"
 	"strconv"
 	"syscall"
 )
@@ -20,10 +21,87 @@ type Context struct {
 	pidFile  string
 	process  *os.Process
 	main     MainFunc
+	pid      int
+}
+
+func (ctx *Context) fatherDo(procName string) (err error) {
+	// flock
+	lockFd, err := syscall.Open(ctx.lockFile, syscall.O_CREAT|syscall.O_WRONLY, syscall.S_IRUSR|syscall.S_IWUSR)
+	if err != nil {
+		return
+	}
+	syscall.Write(lockFd, []byte(procName))
+	err = syscall.Flock(lockFd, syscall.LOCK_EX|syscall.LOCK_NB)
+	//syscall.Close(lockFd)
+	if err != nil {
+		fmt.Println("The Process is already runing ")
+		return
+	}
+
+	stdin, err := os.Open(os.DevNull)
+	if err != nil {
+		return err
+	}
+	stdout, err := os.OpenFile(os.DevNull, os.O_WRONLY, 0)
+	if err != nil {
+		return err
+	}
+	stderr, err := os.OpenFile(os.DevNull, os.O_WRONLY, 0)
+	if err != nil {
+		return err
+	}
+	cwd, _ := os.Getwd()
+	procattr := os.ProcAttr{
+		Dir:   cwd,
+		Env:   append(os.Environ(), procName+"_daemon=true"),
+		Files: []*os.File{stdin, stdout, stderr},
+	}
+	childProc, err := os.StartProcess(os.Args[0], os.Args, &procattr)
+	if err != nil {
+		return
+	}
+
+	ctx.pid = childProc.Pid
+	// pid file
+	pidFd, err := syscall.Open(ctx.pidFile, syscall.O_CREAT|syscall.O_WRONLY, syscall.S_IRUSR|syscall.S_IWUSR)
+	if err != nil {
+		return
+	}
+	curPid := strconv.Itoa(ctx.pid)
+	syscall.Write(pidFd, []byte(curPid))
+	syscall.Close(pidFd)
+
+	err = childProc.Release()
+	if err != nil {
+		return
+	}
+	return
+}
+
+func (ctx *Context) childDo() {
+	ctx.main()
 }
 
 //Daemon run a daemon process
 func (ctx *Context) Daemon() (err error) {
+	cmd := os.Args[0]
+	procName := path.Base(cmd)
+	if procName == "" {
+		fmt.Println("procName is nil ")
+		err = errors.New("ProcName is nil")
+		return
+	}
+	isDaemon := os.Getenv(procName + "_daemon")
+	if isDaemon == "true" {
+		println("child")
+		ctx.childDo()
+		return
+	}
+	err = ctx.fatherDo(procName)
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
 	return
 }
 
@@ -36,64 +114,4 @@ func Boot(lockFilePath, pidFilePath string, main MainFunc) {
 
 	ctx.Daemon()
 
-	// flock
-	lockFd, err := syscall.Open(lockFilePath, syscall.O_CREAT|syscall.O_WRONLY, syscall.S_IRUSR|syscall.S_IWUSR)
-	if err != nil {
-		panic(err)
-	}
-
-	err = syscall.Flock(lockFd, syscall.LOCK_EX|syscall.LOCK_NB)
-	if err != nil {
-		fmt.Println("The Process is already runing ")
-		os.Exit(-1)
-	}
-	println("lock success")
-	// pid file
-	pidFd, err := syscall.Open(pidFilePath, syscall.O_CREAT|syscall.O_WRONLY, syscall.S_IRUSR|syscall.S_IWUSR)
-	if err != nil {
-		panic(err)
-	}
-	_curPid := strconv.Itoa(os.Getpid())
-	syscall.Write(pidFd, []byte(_curPid))
-	syscall.Close(pidFd)
-	println("pid success")
-	// chdir
-	curDir, err := os.Getwd()
-	if err != nil {
-		panic(err)
-	}
-	err = os.Chdir(curDir)
-	if err != nil {
-		panic(err)
-	}
-
-	// umask
-	//syscall.Umask(0x0000)
-
-	// close
-	/*
-		syscall.Close(syscall.Stdin)
-		syscall.Close(syscall.Stdout)
-		syscall.Close(syscall.Stderr)
-
-		// redict
-		fd, err := syscall.Open("/dev/null", syscall.O_RDWR, 0)
-		if err != nil {
-			panic(err)
-		}
-		syscall.Dup2(fd, syscall.Stdin)
-		syscall.Dup2(fd, syscall.Stdout)
-		syscall.Dup2(fd, syscall.Stderr)
-
-	*/
-	// signal
-	//signal.Ignore(syscall.SIGHUP, syscall.SIGINT)
-	//go dealSignal(daemonCh)
-
-	// setuid
-
-	// setgid
-
-	// do process
-	println("boot success")
 }
